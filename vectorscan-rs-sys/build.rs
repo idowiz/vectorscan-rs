@@ -1,10 +1,23 @@
-use std::fs::File;
-use std::path::PathBuf;
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Get the environment variable with the given name, panicking if it is not set.
 fn env(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("`{}` should be set in the environment", name))
+}
+
+fn rename_library(dst: &Path) {
+    // Check common output directories: lib and lib64.
+    for lib_folder in &[dst.join("lib"), dst.join("lib64")] {
+        let hs_path = lib_folder.join("libhs.a");
+        let vs_path = lib_folder.join("libvs.a");
+        if hs_path.exists() {
+            fs::rename(&hs_path, &vs_path).unwrap_or_else(|e| {
+                panic!("Failed to rename {:?} to {:?}: {}", hs_path, vs_path, e)
+            });
+        }
+    }
 }
 
 fn main() {
@@ -193,8 +206,9 @@ fn main() {
         }
 
         let dst = cfg.build();
+        rename_library(&dst);
 
-        println!("cargo:rustc-link-lib=static=hs");
+        println!("cargo:rustc-link-lib=static=vs");
         println!("cargo:rustc-link-search={}", dst.join("lib").display());
         println!("cargo:rustc-link-search={}", dst.join("lib64").display());
     }

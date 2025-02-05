@@ -4,7 +4,7 @@ description = "Native bindings to the Vectorscan high-performance regex library"
 readme = "README.md"
 
 build = "build.rs"
-links = "hs"
+links = "vs"
 
 version.workspace = true
 authors.workspace = true
