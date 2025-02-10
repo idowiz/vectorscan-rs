@@ -121,11 +121,14 @@ fn main() {
 
         let profile = {
             // See https://doc.rust-lang.org/cargo/reference/profiles.html#opt-level for possible values
+            /*
             match env("OPT_LEVEL").as_str() {
                 "0" => "Debug",
                 "s" | "z" => "MinSizeRel",
                 _ => "Release",
             }
+            */
+            "Release"
         };
 
         cfg.profile(profile)
