@@ -48,6 +48,10 @@ impl BlockDatabase {
         let inner = wrapper::Database::try_from(bytes)?;
         Ok(Self { inner })
     }
+
+    pub fn as_ptr(&self) -> *const hs::hs_database_t {
+        self.inner.as_ptr()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
