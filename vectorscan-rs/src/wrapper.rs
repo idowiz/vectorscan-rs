@@ -1,7 +1,7 @@
 use crate::error::{AsResult, Error};
 use bitflags::bitflags;
 use foreign_types::{foreign_type, ForeignType};
-use std::{ffi::CString, mem::MaybeUninit, ptr};
+use std::{convert::TryFrom, ffi::CString, mem::MaybeUninit, ptr};
 use vectorscan_rs_sys as hs;
 
 foreign_type! {
@@ -165,6 +165,19 @@ impl Database {
             hs::hs_stream_size(self.0.as_ptr(), stream_size.as_mut_ptr())
                 .ok()
                 .map(|()| stream_size.assume_init())
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for Database {
+    type Error = Error;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let mut db_ptr = MaybeUninit::zeroed();
+        unsafe {
+            hs::hs_deserialize_database(data.as_ptr() as *const _, data.len(), db_ptr.as_mut_ptr())
+                .ok()
+                .map(|_| Database::from_ptr(db_ptr.assume_init()))
         }
     }
 }

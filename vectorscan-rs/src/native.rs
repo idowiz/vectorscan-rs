@@ -43,6 +43,11 @@ impl BlockDatabase {
     pub fn size(&self) -> Result<usize, Error> {
         self.inner.size()
     }
+
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, Error> {
+        let inner = wrapper::Database::try_from(bytes)?;
+        Ok(Self { inner })
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
