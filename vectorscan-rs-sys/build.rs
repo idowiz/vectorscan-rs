@@ -136,7 +136,6 @@ fn main() {
             .define("CMAKE_VERBOSE_MAKEFILE", "ON")
             .define("BUILD_SHARED_LIBS", "OFF")
             .define("BUILD_STATIC_LIBS", "ON")
-            .define("FAT_RUNTIME", "OFF")
             .define("WARNINGS_AS_ERRORS", "OFF")
             .define("BUILD_EXAMPLES", "OFF")
             .define("BUILD_BENCHMARKS", "OFF")
@@ -148,6 +147,12 @@ fn main() {
 
         if cfg!(feature = "asan") {
             cfg.define("SANITIZE", "address");
+        }
+
+        if cfg!(feature = "fat_runtime") {
+            cfg.define("FAT_RUNTIME", "ON");
+        } else {
+            cfg.define("FAT_RUNTIME", "OFF");
         }
 
         // NOTE: Several Vectorscan feature flags can be set based on available CPU SIMD features.

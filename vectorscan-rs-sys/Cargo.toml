@@ -37,6 +37,10 @@ unit_hyperscan = []
 # This feature causes Vectorscan to build with address sanitizer enabled.
 asan = []
 
+# fat_runtime Add the ability for the VectorScan library to dispatch the
+# most appropriate runtime code for the host processor.
+fat_runtime = []
+
 [build-dependencies]
 bindgen = { version = "0.70", optional = true }
 cmake = "0.1"
