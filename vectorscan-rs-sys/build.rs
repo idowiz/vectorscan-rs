@@ -169,15 +169,41 @@ fn main() {
         // for supported target_feature values.
 
         if cfg!(feature = "simd_specialization") {
-            cfg.define("BUILD_AVX2", "ON");
+            macro_rules! x86_64_feature {
+                () => {{
+                    #[cfg(target_arch = "x86_64")]
+                    {
+                        "ON"
+                    }
+                    #[cfg(not(target_arch = "x86_64"))]
+                    {
+                        "OFF"
+                    }
+                }};
+            }
+
+            macro_rules! aarch64_feature {
+                () => {{
+                    #[cfg(target_arch = "aarch64")]
+                    {
+                        "ON"
+                    }
+                    #[cfg(not(target_arch = "aarch64"))]
+                    {
+                        "OFF"
+                    }
+                }};
+            }
+
+            cfg.define("BUILD_AVX2", x86_64_feature!());
             // XXX use avx512vbmi as a proxy for this, as it's not clear which particular avx512
             // instructions are needed
-            cfg.define("BUILD_AVX512", "ON");
-            cfg.define("BUILD_AVX512VBMI", "ON");
+            cfg.define("BUILD_AVX512", x86_64_feature!());
+            cfg.define("BUILD_AVX512VBMI", x86_64_feature!());
 
-            cfg.define("BUILD_SVE", "ON");
-            cfg.define("BUILD_SVE2", "ON");
-            cfg.define("BUILD_SVE2_BITPERM", "ON");
+            cfg.define("BUILD_SVE", aarch64_feature!());
+            cfg.define("BUILD_SVE2", aarch64_feature!());
+            cfg.define("BUILD_SVE2_BITPERM", aarch64_feature!());
         } else {
             cfg.define("BUILD_AVX2", "OFF")
                 .define("BUILD_AVX512", "OFF")
