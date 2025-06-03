@@ -102,8 +102,10 @@ fn main() {
         );
     }
 
-    // Build with cmake
-    {
+    if let Some(lib_dir) = std::env::var_os("VECTORSCAN_LIB_DIR") {
+        println!("cargo:rustc-link-search={}", lib_dir.display());
+    } else {
+        // Build with cmake
         let mut cfg = cmake::Config::new(&vectorscan_src_dir);
 
         macro_rules! cfg_define_feature {
@@ -216,10 +218,11 @@ fn main() {
         let dst = cfg.build();
         rename_library(&dst);
 
-        println!("cargo:rustc-link-lib=static=vs");
         println!("cargo:rustc-link-search={}", dst.join("lib").display());
         println!("cargo:rustc-link-search={}", dst.join("lib64").display());
     }
+
+    println!("cargo:rustc-link-lib=static=vs");
 
     // Run hyperscan unit test suite
     #[cfg(feature = "unit_hyperscan")]
