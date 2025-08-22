@@ -122,6 +122,24 @@ fn main() {
     let manifest_dir = PathBuf::from(env("CARGO_MANIFEST_DIR"));
     let out_dir = PathBuf::from(env("OUT_DIR"));
 
+    // Choose appropriate C++ runtime library
+    let compiler_version_out = String::from_utf8(
+        Command::new("c++")
+            .args(["-v"])
+            .output()
+            .expect("Failed to get C++ compiler version")
+            .stderr,
+    )
+    .unwrap();
+
+    if compiler_version_out.contains("gcc") {
+        println!("cargo:rustc-link-lib=stdc++");
+    } else if compiler_version_out.contains("clang") {
+        println!("cargo:rustc-link-lib=c++");
+    } else {
+        panic!("No compatible compiler found: either clang or gcc is needed");
+    }
+
     if let Some(lib_dir) = std::env::var_os("VECTORSCAN_LIB_DIR") {
         println!("cargo:rustc-link-search={}", lib_dir.display());
     } else {
@@ -133,26 +151,6 @@ fn main() {
                 .into_os_string()
                 .into_string()
                 .unwrap();
-
-            // Choose appropriate C++ runtime library
-            {
-                let compiler_version_out = String::from_utf8(
-                    Command::new("c++")
-                        .args(["-v"])
-                        .output()
-                        .expect("Failed to get C++ compiler version")
-                        .stderr,
-                )
-                .unwrap();
-
-                if compiler_version_out.contains("gcc") {
-                    println!("cargo:rustc-link-lib=stdc++");
-                } else if compiler_version_out.contains("clang") {
-                    println!("cargo:rustc-link-lib=c++");
-                } else {
-                    panic!("No compatible compiler found: either clang or gcc is needed");
-                }
-            }
 
             let tarball_path = manifest_dir.join(format!("{VERSION}.tar.gz"));
             let vectorscan_src_dir = bound_out_dir.join(format!("vectorscan-vectorscan-{VERSION}"));
