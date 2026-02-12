@@ -42,8 +42,10 @@ asan = []
 fat_runtime = []
 
 [build-dependencies]
-anyhow = "1"
 bindgen = { version = "0.70", optional = true }
+
+[target.'cfg(not(target_os = "windows"))'.build-dependencies]
+anyhow = "1"
 cmake = "0.1"
 flate2 = "1.0"
 libc = "0.2"

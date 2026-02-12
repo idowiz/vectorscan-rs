@@ -1,8 +1,15 @@
+use std::path::PathBuf;
+
+#[cfg(not(target_os = "windows"))]
 use std::fs::{self, File};
+#[cfg(not(target_os = "windows"))]
 use std::io::Write;
-use std::path::{Path, PathBuf};
+#[cfg(not(target_os = "windows"))]
+use std::path::Path;
+#[cfg(not(target_os = "windows"))]
 use std::process::Command;
 
+#[cfg(not(target_os = "windows"))]
 use nix::{
     errno, mount,
     sched::{unshare, CloneFlags},
@@ -10,6 +17,7 @@ use nix::{
     unistd,
 };
 
+#[cfg(not(target_os = "windows"))]
 use anyhow::{Context, Result};
 
 /// Get the environment variable with the given name, panicking if it is not set.
@@ -17,6 +25,7 @@ fn env(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("`{}` should be set in the environment", name))
 }
 
+#[cfg(not(target_os = "windows"))]
 fn rename_library(dst: &Path) {
     // Check common output directories: lib and lib64.
     for lib_folder in &[dst.join("lib"), dst.join("lib64")] {
@@ -30,6 +39,7 @@ fn rename_library(dst: &Path) {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 fn setup_environment(out_dir: &Path, target_dir: &Path) -> Result<()> {
     // Get real uid & gid
     let uid = unistd::getuid();
@@ -74,6 +84,7 @@ fn setup_environment(out_dir: &Path, target_dir: &Path) -> Result<()> {
 ///
 /// In case namespace unsharing is unsupported or blocked, the callback function
 /// would be called directly, but with `out_dir` passed to both of its arguments.
+#[cfg(not(target_os = "windows"))]
 fn run_contained<F>(out_dir: &Path, f: F)
 where
     F: Fn(&Path, &Path),
@@ -112,40 +123,47 @@ where
 }
 
 fn main() {
-    const VERSION: &str = "5.4.11";
-
     // Note: use `rerun-if-changed=build.rs` to indicate that this build script *shouldn't* be
     // rerun: see https://doc.rust-lang.org/cargo/reference/build-scripts.html#change-detection
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=vectorscan.patch");
 
-    let manifest_dir = PathBuf::from(env("CARGO_MANIFEST_DIR"));
     let out_dir = PathBuf::from(env("OUT_DIR"));
 
     // Choose appropriate C++ runtime library
-    let compiler_version_out = String::from_utf8(
-        Command::new("c++")
-            .args(["-v"])
-            .output()
-            .expect("Failed to get C++ compiler version")
-            .stderr,
-    )
-    .unwrap();
+    #[cfg(not(target_os = "windows"))]
+    {
+        let compiler_version_out = String::from_utf8(
+            Command::new("c++")
+                .args(["-v"])
+                .output()
+                .expect("Failed to get C++ compiler version")
+                .stderr,
+        )
+        .unwrap();
 
-    if compiler_version_out.contains("gcc") {
-        println!("cargo:rustc-link-lib=stdc++");
-    } else if compiler_version_out.contains("clang") {
-        println!("cargo:rustc-link-lib=c++");
-    } else {
-        panic!("No compatible compiler found: either clang or gcc is needed");
+        if compiler_version_out.contains("gcc") {
+            println!("cargo:rustc-link-lib=stdc++");
+        } else if compiler_version_out.contains("clang") {
+            println!("cargo:rustc-link-lib=c++");
+        } else {
+            panic!("No compatible compiler found: either clang or gcc is needed");
+        }
     }
 
     if let Some(lib_dir) = std::env::var_os("VECTORSCAN_LIB_DIR") {
         println!("cargo:rustc-link-search={}", lib_dir.display());
     } else {
+        #[cfg(target_os = "windows")]
+        panic!("VECTORSCAN_LIB_DIR must be set on Windows to point to the directory containing the prebuilt vectorscan library");
+
         // In order to trick ccache into thinking the output directory is always
         // the same, try to run the build with a deterministic output directory
-        run_contained(&out_dir, move |out_dir, bound_out_dir| {
+        #[cfg(not(target_os = "windows"))]
+        {
+            const VERSION: &str = "5.4.11";
+            let manifest_dir = PathBuf::from(env("CARGO_MANIFEST_DIR"));
+            run_contained(&out_dir, move |out_dir, bound_out_dir| {
             let include_dir = bound_out_dir
                 .join("include")
                 .into_os_string()
@@ -318,6 +336,7 @@ fn main() {
                 out_dir.join("lib64").display()
             );
         });
+        }
     }
 
     println!("cargo:rustc-link-lib=static=vs");
