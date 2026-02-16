@@ -1,6 +1,9 @@
 [workspace]
-members = ["vectorscan-rs", "vectorscan-rs-sys"]
+members = ["vectorscan-rs", "vectorscan-rs-sys", "vectorscan-rs-cdylib"]
 resolver = "2"
+
+[profile.release.package.vectorscan-rs-cdylib]
+debug = true
 
 [workspace.package]
 

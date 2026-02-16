@@ -41,6 +41,11 @@ asan = []
 # most appropriate runtime code for the host processor.
 fat_runtime = []
 
+# Force-include all symbols from the vectorscan static library via
+# --whole-archive. Used by the cdylib crate to produce a DLL/so.
+whole_archive = []
+
+
 [build-dependencies]
 bindgen = { version = "0.70", optional = true }
 cmake = "0.1"
