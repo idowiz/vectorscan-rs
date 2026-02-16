@@ -8,30 +8,28 @@ fn env(name: &str) -> String {
 }
 
 fn rename_library(dst: &Path) {
-    // Check common output directories: lib and lib64.
     for lib_folder in &[dst.join("lib"), dst.join("lib64")] {
-        let hs_path = lib_folder.join("libhs.a");
-        let vs_path = lib_folder.join("libvs.a");
-        if hs_path.exists() {
-            fs::rename(&hs_path, &vs_path).unwrap_or_else(|e| {
-                panic!("Failed to rename {:?} to {:?}: {}", hs_path, vs_path, e)
+        let src = lib_folder.join("libhs.a");
+        let dest = lib_folder.join("libvs.a");
+        if src.exists() {
+            fs::rename(&src, &dest).unwrap_or_else(|e| {
+                panic!("Failed to rename {:?} to {:?}: {}", src, dest, e)
             });
         }
     }
 }
 
-fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, version: &str) {
+fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, is_windows_gnu: bool) {
     let include_dir = out_dir
         .join("include")
         .into_os_string()
         .into_string()
         .unwrap();
 
-    let tarball_path = manifest_dir.join(format!("{version}.tar.gz"));
-    let vectorscan_src_dir = out_dir.join(format!("vectorscan-vectorscan-{version}"));
+    let tarball_path = manifest_dir.join("5.4.12.tar.gz");
+    let vectorscan_src_dir = out_dir.join("vectorscan-5.4.12");
 
-    // Note: patchfile created by diffing pristine extracted release directory tree with modified
-    // directory tree, and then running `diff -ruN PRISTINE MODIFIED >PATCHFILE`
+    // patch generated with `git diff --no-index`, applied with -p2
     let patchfile = manifest_dir.join("vectorscan.patch");
 
     // Extract release tarball
@@ -45,11 +43,20 @@ fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, version: &str) {
             File::open(tarball_path).expect("Failed to open Vectorscan release tarball");
         let gz = flate2::read::GzDecoder::new(infile);
         let mut tar = tar::Archive::new(gz);
-        // Note: unpack into `out_dir`, giving us the directory at `vectorscan_src_dir`.
-        // The downloaded tarball has `vectorscan-vectorscan-{VERSION}` as a prefix on all its entries.
-        tar.unpack(out_dir)
-            .expect("Could not unpack Vectorscan source files");
-        eprintln!("Tarball extracted to {}", out_dir.display());
+        for entry in tar.entries().expect("Failed to read tarball entries") {
+            let mut entry = entry.expect("Failed to read tarball entry");
+            let path = entry.path().expect("Failed to read entry path").into_owned();
+            let stripped: PathBuf = path.components().skip(1).collect();
+            if stripped.as_os_str().is_empty() {
+                continue;
+            }
+            let dest = vectorscan_src_dir.join(&stripped);
+            if let Some(parent) = dest.parent() {
+                fs::create_dir_all(parent).expect("Failed to create parent directory");
+            }
+            entry.unpack(&dest).expect("Failed to unpack tarball entry");
+        }
+        eprintln!("Tarball extracted to {}", vectorscan_src_dir.display());
     }
 
     eprintln!(
@@ -59,14 +66,18 @@ fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, version: &str) {
 
     // Patch release tarball
     {
-        let patchfile = File::open(patchfile).expect("Failed to open patchfile");
+        let patchfile = File::open(&patchfile).expect("Failed to open patchfile");
         let output = Command::new("patch")
-            .args(["-p1"])
+            .arg("-p2")
             .current_dir(&vectorscan_src_dir)
             .stdin(patchfile)
             .output()
             .expect("Failed to apply patchfile");
-        assert!(output.status.success());
+        assert!(
+            output.status.success(),
+            "Failed to apply patch: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
         eprintln!(
             "Successfully applied patches to Vectorscan source directory at {}",
             vectorscan_src_dir.display()
@@ -90,18 +101,7 @@ fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, version: &str) {
         };
     }
 
-    let profile = {
-        // See https://doc.rust-lang.org/cargo/reference/profiles.html#opt-level for possible values
-        /*
-        match env("OPT_LEVEL").as_str() {
-            "0" => "Debug",
-            "s" | "z" => "MinSizeRel",
-            _ => "Release",
-        }
-        */
-        "Release"
-    };
-
+    let profile = if is_windows_gnu { "RelWithDebInfo" } else { "Release" };
     cfg.profile(profile)
         .define("CMAKE_INSTALL_INCLUDEDIR", &include_dir)
         .define("CMAKE_VERBOSE_MAKEFILE", "ON")
@@ -184,7 +184,32 @@ fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, version: &str) {
             .define("BUILD_SVE2_BITPERM", "OFF");
     }
 
+    if is_windows_gnu {
+        cfg.define("GNUCC_ARCH", "x86-64");
+        cfg.define("TUNE_FLAG", "generic");
+        cfg.cflag("-Wno-narrowing");
+        cfg.cxxflag("-Wno-narrowing");
+
+        if cfg!(feature = "fat_runtime") {
+            let libc_path = String::from_utf8(
+                Command::new("gcc")
+                    .args(["--print-file-name=libmsvcrt.a"])
+                    .output()
+                    .expect("Failed to get libmsvcrt.a path from gcc")
+                    .stdout,
+            )
+            .expect("Invalid UTF-8 in gcc output")
+            .trim()
+            .to_string();
+            std::env::set_var("VECTORSCAN_LIBC_SO", &libc_path);
+            std::env::set_var("NM", "nm");
+            std::env::set_var("OBJCOPY", "objcopy");
+            std::env::set_var("OBJDUMP", "objdump");
+        }
+    }
+
     cfg.build();
+
     rename_library(out_dir);
 
     println!("cargo:rustc-link-search={}", out_dir.join("lib").display());
@@ -195,54 +220,83 @@ fn build_vectorscan(manifest_dir: &Path, out_dir: &Path, version: &str) {
 }
 
 fn main() {
-    const VERSION: &str = "5.4.11";
+    let target_os = env("CARGO_CFG_TARGET_OS");
+    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let is_windows_gnu = target_os == "windows" && target_env == "gnu";
+    let is_windows_msvc = target_os == "windows" && target_env == "msvc";
+
+
+    println!("cargo:rerun-if-env-changed=VECTORSCAN_LIB_DIR");
 
     // Note: use `rerun-if-changed=build.rs` to indicate that this build script *shouldn't* be
     // rerun: see https://doc.rust-lang.org/cargo/reference/build-scripts.html#change-detection
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=vectorscan.patch");
 
+    // Features affect cmake configuration, so the build script must re-run when they change.
+    // CARGO_FEATURE_* env vars are set by cargo when features are enabled.
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_FAT_RUNTIME");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_SIMD_SPECIALIZATION");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_CPU_NATIVE");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_UNIT_HYPERSCAN");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_ASAN");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_WHOLE_ARCHIVE");
+
     let manifest_dir = PathBuf::from(env("CARGO_MANIFEST_DIR"));
     let out_dir = PathBuf::from(env("OUT_DIR"));
 
-    // Choose appropriate C++ runtime library
-    let compiler_version_out = String::from_utf8(
-        Command::new("c++")
-            .args(["-v"])
-            .output()
-            .expect("Failed to get C++ compiler version")
-            .stderr,
-    )
-    .unwrap();
-
-    if compiler_version_out.contains("gcc") {
-        println!("cargo:rustc-link-lib=stdc++");
-    } else if compiler_version_out.contains("clang") {
-        println!("cargo:rustc-link-lib=c++");
+    if is_windows_msvc {
+        let lib_dir = std::env::var("VECTORSCAN_LIB_DIR").expect(
+            "VECTORSCAN_LIB_DIR must be set for MSVC targets, \
+             pointing to a directory containing vs.lib (import library for vs.dll)",
+        );
+        println!("cargo:rustc-link-search={lib_dir}");
+        println!("cargo:rustc-link-lib=dylib=vs");
     } else {
-        panic!("No compatible compiler found: either clang or gcc is needed");
-    }
+        if is_windows_gnu {
+            println!("cargo:rustc-link-lib=stdc++");
+        } else {
+            let compiler_version_out = String::from_utf8(
+                Command::new("c++")
+                    .args(["-v"])
+                    .output()
+                    .expect("Failed to get C++ compiler version")
+                    .stderr,
+            )
+            .unwrap();
 
-    if let Some(lib_dir) = std::env::var_os("VECTORSCAN_LIB_DIR") {
-        println!("cargo:rustc-link-search={}", lib_dir.display());
-    } else {
-        build_vectorscan(&manifest_dir, &out_dir, VERSION);
-    }
+            if compiler_version_out.contains("gcc") {
+                println!("cargo:rustc-link-lib=stdc++");
+            } else if compiler_version_out.contains("clang") {
+                println!("cargo:rustc-link-lib=c++");
+            } else {
+                panic!("No compatible compiler found: either clang or gcc is needed");
+            }
+        }
 
-    println!("cargo:rustc-link-lib=static=vs");
+        if let Some(lib_dir) = std::env::var_os("VECTORSCAN_LIB_DIR") {
+            println!("cargo:rustc-link-search={}", lib_dir.display());
+        } else {
+            build_vectorscan(&manifest_dir, &out_dir, is_windows_gnu);
+        }
 
-    // Run hyperscan unit test suite
-    #[cfg(feature = "unit_hyperscan")]
-    {
-        let unittests = out_dir.join("build").join("bin").join("unit-hyperscan");
-        match Command::new(unittests).status() {
-            Ok(rc) if rc.success() => {}
-            Ok(rc) => panic!("Failed to run unit tests: exit with code {rc}"),
-            Err(e) => panic!("Failed to run unit tests: {e}"),
+        if cfg!(feature = "whole_archive") {
+            println!("cargo:rustc-link-lib=static:+whole-archive=vs");
+        } else {
+            println!("cargo:rustc-link-lib=static=vs");
+        }
+
+        #[cfg(feature = "unit_hyperscan")]
+        {
+            let unittests = out_dir.join("build").join("bin").join("unit-hyperscan");
+            match Command::new(unittests).status() {
+                Ok(rc) if rc.success() => {}
+                Ok(rc) => panic!("Failed to run unit tests: exit with code {rc}"),
+                Err(e) => panic!("Failed to run unit tests: {e}"),
+            }
         }
     }
 
-    // Run bindgen if needed, or else use the pre-generated bindings
     #[cfg(feature = "bindgen")]
     {
         let config = bindgen::Builder::default()
@@ -259,7 +313,7 @@ fn main() {
     }
     #[cfg(not(feature = "bindgen"))]
     {
-        std::fs::copy("src/bindings.rs", out_dir.join("bindings.rs"))
+        fs::copy("src/bindings.rs", out_dir.join("bindings.rs"))
             .expect("Failed to write Rust bindings to Vectorscan");
     }
 }

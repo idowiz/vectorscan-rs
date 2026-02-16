@@ -1,8 +1,7 @@
-diff --git a/pristine/CMakeLists.txt b/modified/CMakeLists.txt
-index ea0ae71..defbebd 100644
---- a/pristine/CMakeLists.txt
-+++ b/modified/CMakeLists.txt
-@@ -24,16 +24,9 @@ INCLUDE (CheckSymbolExists)
+diff -ruN vectorscan-vectorscan-5.4.12.orig/CMakeLists.txt vectorscan-vectorscan-5.4.12/CMakeLists.txt
+--- vectorscan-vectorscan-5.4.12.orig/CMakeLists.txt	2025-07-22 11:09:14
++++ vectorscan-vectorscan-5.4.12/CMakeLists.txt	2026-02-19 22:58:22
+@@ -24,16 +24,9 @@
  include (CMakeDependentOption)
  include (GNUInstallDirs)
  include (${CMAKE_MODULE_PATH}/boost.cmake)
@@ -19,7 +18,7 @@ index ea0ae71..defbebd 100644
  # Add ccache to speed builds
  find_program(CCACHE_FOUND ccache)
  if(CCACHE_FOUND)
-@@ -108,6 +101,7 @@ endif ()
+@@ -108,6 +101,7 @@
  
  CMAKE_DEPENDENT_OPTION(DUMP_SUPPORT "Dump code support; normally on, except in release builds" ON "NOT RELEASE_BUILD" OFF)
  CMAKE_DEPENDENT_OPTION(DISABLE_ASSERTS "Disable assert(); Asserts are enabled in debug builds, disabled in release builds" OFF "NOT RELEASE_BUILD" ON)
@@ -27,7 +26,7 @@ index ea0ae71..defbebd 100644
  
  option(DEBUG_OUTPUT "Enable debug output (warning: very verbose)" OFF)
  if(DEBUG_OUTPUT)
-@@ -159,11 +153,11 @@ include (${CMAKE_MODULE_PATH}/archdetect.cmake)
+@@ -159,11 +153,11 @@
  include (${CMAKE_MODULE_PATH}/sanitize.cmake)
  
  if (NOT FAT_RUNTIME)
@@ -41,7 +40,7 @@ index ea0ae71..defbebd 100644
          message(STATUS "GNUCC_TUNE is not set")
          set(ARCH_C_FLAGS "-${ARCH_FLAG}=${GNUCC_ARCH} -mtune=${TUNE_FLAG} ${ARCH_C_FLAGS}")
          set(ARCH_CXX_FLAGS "-${ARCH_FLAG}=${GNUCC_ARCH} -mtune=${TUNE_FLAG} ${ARCH_CXX_FLAGS}")
-@@ -221,15 +215,11 @@ set_source_files_properties(
+@@ -221,15 +215,11 @@
      PROPERTIES
          COMPILE_FLAGS "${RAGEL_C_FLAGS}")
  
@@ -57,18 +56,18 @@ index ea0ae71..defbebd 100644
  # BSD has the _np funcs in a _np header
  CHECK_INCLUDE_FILE_CXX(pthread_np.h HAVE_PTHREAD_NP_H)
  if (HAVE_PTHREAD_NP_H)
-@@ -1265,10 +1255,6 @@ if (BUILD_SHARED_LIBS)
-         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+@@ -1265,10 +1255,6 @@
  endif()
  
--if (BUILD_STATIC_LIBS)
+ if (BUILD_STATIC_LIBS)
 -    add_dependencies(hs ragel_Parser)
 -endif ()
 -
- if (BUILD_STATIC_LIBS)
+-if (BUILD_STATIC_LIBS)
      install(TARGETS hs DESTINATION ${CMAKE_INSTALL_LIBDIR})
  endif()
-@@ -1292,7 +1278,6 @@ if (BUILD_SHARED_LIBS)
+ 
+@@ -1291,7 +1277,6 @@
  
      add_library(hs_shared SHARED ${hs_shared_SRCS} hs.def)
  
@@ -76,86 +75,10 @@ index ea0ae71..defbebd 100644
      set_target_properties(hs_shared PROPERTIES
          OUTPUT_NAME hs
          VERSION ${LIB_VERSION}
-diff --git a/pristine/cmake/build_wrapper.sh b/modified/cmake/build_wrapper.sh
-index 32bdf1c..5521b75 100644
---- a/pristine/cmake/build_wrapper.sh
-+++ b/modified/cmake/build_wrapper.sh
-@@ -2,38 +2,56 @@
- # This is used for renaming symbols for the fat runtime, don't call directly
- # TODO: make this a lot less fragile!
- cleanup () {
--    rm -f ${SYMSFILE} ${KEEPSYMS}
-+    rm -f ${SYMSFILE} ${KEEPSYMS} ${LIBC_SYMS}
- }
- 
- NM="${NM:-nm}"
- OBJCOPY="${OBJCOPY:-objcopy}"
-+OBJDUMP="${OBJDUMP:-objdump}"
- 
- PREFIX=$1
- KEEPSYMS_IN=$2
- shift 2
- # $@ contains the actual build command
--OUT=$(echo "$@" | rev | cut -d ' ' -f 2- | rev | sed 's/.* -o \(.*\.o\).*/\1/')
-+OUT=$(echo "$@" | rev | cut -d ' ' -f 2- | rev | sed 's/.* -o \(.*\.obj\).*/\1/')
- trap cleanup INT QUIT EXIT
- SYMSFILE=$(mktemp -p /tmp ${PREFIX}_rename.syms.XXXXX)
- KEEPSYMS=$(mktemp -p /tmp keep.syms.XXXXX)
--# find the libc used by gcc
--LIBC_SO=$("$@" --print-file-name=libc.so.6)
-+LIBC_SYMS=$(mktemp -p /tmp keep_libc.syms.XXXXX)
-+# Use MinGW C runtime instead of libc.so.6
-+# VECTORSCAN_LIBC_SO is set by the build function to the correct path for the environment
-+LIBC_SO="${VECTORSCAN_LIBC_SO:-/usr/x86_64-w64-mingw32/lib/libcrtdll.a}"
- NM_FLAG="-f"
--if [ `uname` = "FreeBSD" ]; then
--    # for freebsd, we will specify the name, 
--    # we will leave it work as is in linux
--    LIBC_SO=/lib/libc.so.7
--    # also, in BSD, the nm flag -F corresponds to the -f flag in linux.
--    NM_FLAG="-F"
--fi
- cp ${KEEPSYMS_IN} ${KEEPSYMS}
--# get all symbols from libc and turn them into patterns
--${NM} ${NM_FLAG} posix -g -D ${LIBC_SO} | sed 's/\([^ @]*\).*/^\1$/' >> ${KEEPSYMS}
-+# Extract C runtime symbols as plain names (no regex) for fixed-string matching.
-+# Using grep -F avoids issues with symbols containing regex metacharacters (e.g. brackets
-+# in libmsvcrt.a) that would cause "Invalid range end" errors with regex grep.
-+${NM} ${NM_FLAG} posix -g ${LIBC_SO} | awk '{print $1}' >> ${LIBC_SYMS}
- # build the object
- "$@"
- # rename the symbols in the object
--${NM} ${NM_FLAG} posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | sed -e "s/\(.*\)/\1\ ${PREFIX}_\1/" >> ${SYMSFILE}
-+# First filter by keep.syms.in regex patterns, then by C runtime symbols (fixed-string match)
-+${NM} ${NM_FLAG} posix -g ${OUT} | cut -f1 -d' ' | grep -v -f ${KEEPSYMS} | \
-+    grep -F -x -v -f ${LIBC_SYMS} | \
-+    sed "s/\(.*\)/\1 ${PREFIX}_\1/" >> ${SYMSFILE}
- if test -s ${SYMSFILE}
- then
-     ${OBJCOPY} --redefine-syms=${SYMSFILE} ${OUT}
- fi
-+
-+# Also rename .refptr sections to avoid COMDAT conflicts (MinGW-specific)
-+SECTFILE=$(mktemp -p /tmp ${PREFIX}_sections.XXXXX)
-+
-+# Get list of .rdata$.refptr.* sections - use objdump -h to show section headers
-+${OBJDUMP} -h ${OUT} 2>/dev/null | grep '\.rdata\$\.refptr\.' | awk '{print $2}' | while IFS= read -r sect; do
-+    # Skip hs_* sections (shared API symbols that must not be renamed)
-+    case "$sect" in
-+        *.refptr.hs_*) continue ;;
-+    esac
-+    echo "--rename-section=${sect}=${PREFIX}_${sect}" >> ${SECTFILE}
-+done 2>/dev/null
-+
-+if [ -s "${SECTFILE}" ]; then
-+    ${OBJCOPY} $(cat ${SECTFILE}) ${OUT} 2>/dev/null
-+fi
-+rm -f "${SECTFILE}" 2>/dev/null
-diff --git a/pristine/cmake/cflags-generic.cmake b/modified/cmake/cflags-generic.cmake
-index 7551690..92d8923 100644
---- a/pristine/cmake/cflags-generic.cmake
-+++ b/modified/cmake/cflags-generic.cmake
-@@ -6,8 +6,10 @@ if (NOT CMAKE_COMPILER_IS_CLANG)
+diff -ruN vectorscan-vectorscan-5.4.12.orig/cmake/cflags-generic.cmake vectorscan-vectorscan-5.4.12/cmake/cflags-generic.cmake
+--- vectorscan-vectorscan-5.4.12.orig/cmake/cflags-generic.cmake	2025-07-22 11:09:14
++++ vectorscan-vectorscan-5.4.12/cmake/cflags-generic.cmake	2026-02-19 23:02:07
+@@ -6,8 +6,10 @@
  endif()
  
  # Always use -Werror *also during release builds
@@ -168,27 +91,9 @@ index 7551690..92d8923 100644
  
  if (DISABLE_ASSERTS)
      set(EXTRA_C_FLAGS "${EXTRA_C_FLAGS} -DNDEBUG")
-diff --git a/pristine/cmake/osdetection.cmake b/modified/cmake/osdetection.cmake
-index 5a8a532..7535766 100644
---- a/pristine/cmake/osdetection.cmake
-+++ b/modified/cmake/osdetection.cmake
-@@ -38,9 +38,9 @@ if (FAT_RUNTIME)
-     else()
-         message(STATUS "Building Fat runtime for multiple microarchitectures")
-         message(STATUS "generator is ${CMAKE_GENERATOR}")
--        if (NOT (CMAKE_GENERATOR MATCHES "Unix Makefiles" OR
-+        if (NOT (CMAKE_GENERATOR MATCHES "Makefiles" OR
-             (CMAKE_VERSION VERSION_GREATER "3.0" AND CMAKE_GENERATOR MATCHES "Ninja")))
--            message (FATAL_ERROR "Building the fat runtime requires the Unix Makefiles generator, or Ninja with CMake v3.0 or higher")
-+            message (FATAL_ERROR "Building the fat runtime requires the Makefiles generator, or Ninja with CMake v3.0 or higher")
-         endif()
-     endif()
-     if (NOT RELEASE_BUILD)
-diff --git a/modified/src/parser/Parser.cpp b/modified/src/parser/Parser.cpp
-new file mode 100644
-index 0000000..21a7dcc
---- /dev/null
-+++ b/modified/src/parser/Parser.cpp
+diff -ruN vectorscan-vectorscan-5.4.12.orig/src/parser/Parser.cpp vectorscan-vectorscan-5.4.12/src/parser/Parser.cpp
+--- vectorscan-vectorscan-5.4.12.orig/src/parser/Parser.cpp	1969-12-31 19:00:00
++++ vectorscan-vectorscan-5.4.12/src/parser/Parser.cpp	2026-02-19 23:05:37
 @@ -0,0 +1,5606 @@
 +
 +#line 1 "./src/parser/Parser.rl"
@@ -5796,11 +5701,9 @@ index 0000000..21a7dcc
 +}
 +
 +} // namespace ue2
-diff --git a/modified/src/parser/control_verbs.cpp b/modified/src/parser/control_verbs.cpp
-new file mode 100644
-index 0000000..1058c0c
---- /dev/null
-+++ b/modified/src/parser/control_verbs.cpp
+diff -ruN vectorscan-vectorscan-5.4.12.orig/src/parser/control_verbs.cpp vectorscan-vectorscan-5.4.12/src/parser/control_verbs.cpp
+--- vectorscan-vectorscan-5.4.12.orig/src/parser/control_verbs.cpp	1969-12-31 19:00:00
++++ vectorscan-vectorscan-5.4.12/src/parser/control_verbs.cpp	2026-02-19 23:05:37
 @@ -0,0 +1,445 @@
 +
 +#line 1 "./src/parser/control_verbs.rl"
@@ -6247,11 +6150,10 @@ index 0000000..1058c0c
 +}
 +
 +} // namespace ue2
-diff --git a/pristine/tools/hscollider/CMakeLists.txt b/modified/tools/hscollider/CMakeLists.txt
-index f9e7140..c8cd1f9 100644
---- a/pristine/tools/hscollider/CMakeLists.txt
-+++ b/modified/tools/hscollider/CMakeLists.txt
-@@ -21,8 +21,6 @@ set_source_files_properties(
+diff -ruN vectorscan-vectorscan-5.4.12.orig/tools/hscollider/CMakeLists.txt vectorscan-vectorscan-5.4.12/tools/hscollider/CMakeLists.txt
+--- vectorscan-vectorscan-5.4.12.orig/tools/hscollider/CMakeLists.txt	2025-07-22 11:09:14
++++ vectorscan-vectorscan-5.4.12/tools/hscollider/CMakeLists.txt	2026-02-19 22:55:48
+@@ -21,8 +21,6 @@
      PROPERTIES
      COMPILE_FLAGS "${RAGEL_C_FLAGS} -I${CMAKE_CURRENT_SOURCE_DIR}")
  
@@ -6260,7 +6162,7 @@ index f9e7140..c8cd1f9 100644
  if (BUILD_CHIMERA)
      add_definitions(-DHS_HYBRID)
  endif()
-@@ -63,7 +61,6 @@ SET(hscollider_SOURCES
+@@ -63,7 +61,6 @@
  set_source_files_properties(${hscollider_SOURCES} PROPERTIES
      INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR})
  add_executable(hscollider ${hscollider_SOURCES})
@@ -6268,11 +6170,9 @@ index f9e7140..c8cd1f9 100644
  
  if (BUILD_CHIMERA)
      target_link_libraries(hscollider hs chimera ${PCRE_LDFLAGS} databaseutil
-diff --git a/modified/tools/hscollider/ColliderCorporaParser.cpp b/modified/tools/hscollider/ColliderCorporaParser.cpp
-new file mode 100644
-index 0000000..2cabd32
---- /dev/null
-+++ b/modified/tools/hscollider/ColliderCorporaParser.cpp
+diff -ruN vectorscan-vectorscan-5.4.12.orig/tools/hscollider/ColliderCorporaParser.cpp vectorscan-vectorscan-5.4.12/tools/hscollider/ColliderCorporaParser.cpp
+--- vectorscan-vectorscan-5.4.12.orig/tools/hscollider/ColliderCorporaParser.cpp	1969-12-31 19:00:00
++++ vectorscan-vectorscan-5.4.12/tools/hscollider/ColliderCorporaParser.cpp	2026-02-19 23:05:37
 @@ -0,0 +1,446 @@
 +
 +#line 1 "./tools/hscollider/ColliderCorporaParser.rl"
@@ -6720,11 +6620,10 @@ index 0000000..2cabd32
 +
 +    return (cs != FileCorporaParser_error) && (p == pe);
 +}
-diff --git a/pristine/util/CMakeLists.txt b/modified/util/CMakeLists.txt
-index 97fd4c7..e1f83bf 100644
---- a/pristine/util/CMakeLists.txt
-+++ b/modified/util/CMakeLists.txt
-@@ -13,8 +13,6 @@ set_source_files_properties(
+diff -ruN vectorscan-vectorscan-5.4.12.orig/util/CMakeLists.txt vectorscan-vectorscan-5.4.12/util/CMakeLists.txt
+--- vectorscan-vectorscan-5.4.12.orig/util/CMakeLists.txt	2025-07-22 11:09:14
++++ vectorscan-vectorscan-5.4.12/util/CMakeLists.txt	2026-02-19 22:55:48
+@@ -13,8 +13,6 @@
      PROPERTIES
      COMPILE_FLAGS "${RAGEL_C_FLAGS}")
  
@@ -6733,7 +6632,7 @@ index 97fd4c7..e1f83bf 100644
  set(expressionutil_SRCS
      expressions.cpp
      expressions.h
-@@ -22,7 +20,6 @@ set(expressionutil_SRCS
+@@ -22,7 +20,6 @@
      ExpressionParser.cpp
      )
  add_library(expressionutil STATIC ${expressionutil_SRCS})
@@ -6741,11 +6640,9 @@ index 97fd4c7..e1f83bf 100644
  
  SET(corpusomatic_SRCS
      ng_corpus_editor.h
-diff --git a/modified/util/ExpressionParser.cpp b/modified/util/ExpressionParser.cpp
-new file mode 100644
-index 0000000..c570068
---- /dev/null
-+++ b/modified/util/ExpressionParser.cpp
+diff -ruN vectorscan-vectorscan-5.4.12.orig/util/ExpressionParser.cpp vectorscan-vectorscan-5.4.12/util/ExpressionParser.cpp
+--- vectorscan-vectorscan-5.4.12.orig/util/ExpressionParser.cpp	1969-12-31 19:00:00
++++ vectorscan-vectorscan-5.4.12/util/ExpressionParser.cpp	2026-02-19 23:05:37
 @@ -0,0 +1,437 @@
 +
 +#line 1 "./util/ExpressionParser.rl"
