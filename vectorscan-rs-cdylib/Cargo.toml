@@ -1,0 +1,22 @@
+[package]
+name = "vectorscan-rs-cdylib"
+description = "Vectorscan as a shared library (DLL/so) for cross-toolchain linking"
+
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+simd_specialization = ["vectorscan-rs-sys/simd_specialization"]
+cpu_native = ["vectorscan-rs-sys/cpu_native"]
+fast_nonportable = ["cpu_native", "simd_specialization"]
+fat_runtime = ["vectorscan-rs-sys/fat_runtime"]
+
+[lib]
+name = "vs"
+crate-type = ["cdylib"]
+
+[dependencies]
+vectorscan-rs-sys = { path = "../vectorscan-rs-sys", features = ["whole_archive"] }
+
