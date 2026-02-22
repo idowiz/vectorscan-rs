@@ -1,3 +1,42 @@
+Copyright 2024-2025 Bradford Larsen <brad@bradfordlarsen.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
+This product includes software from the `vectorscan-rs` Rust crate that
+provides bindings to the `vectorscan` regular expression library found at
+
+    https://github.com/bradlarsen/vectorscan-rs
+
+This crate was originally written as part of Nosey Parker, developed by
+Praetorian Security, Inc, and found at
+
+    https://github.com/praetorian-inc/noseyparker
+
+It was adapted from the `pyperscan` project, which uses Rust to expose
+Hyperscan to Python. `pyperscan` is released under either the Apache 2.0 or MIT
+license, and is found at
+
+    https://github.com/vlaci/pyperscan
+
+This product also contains a vendored copy of Vectorscan 5.4.11,
+which is released under the BSD license and found at
+
+    https://github.com/Vectorcamp/vectorscan
+
+
+--------------------------------------------------------------------------------
+
 Hyperscan is licensed under the BSD License.
 
 Copyright (c) 2015, Intel Corporation
@@ -119,5 +158,3 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-

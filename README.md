@@ -24,4 +24,5 @@ This project is licensed under either of
 
 at your option.
 
-This project also includes a vendored copy of Vectorscan, which is distributed under the BSD license ([LICENSE-VECTORSCAN](LICENSE-VECTORSCAN)).
+This project also includes a vendored copy of Vectorscan, which is distributed under the BSD license.
+See the [NOTICE](NOTICE) file for details.

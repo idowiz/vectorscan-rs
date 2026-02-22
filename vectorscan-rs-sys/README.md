@@ -45,7 +45,8 @@ This project is licensed under either of
 
 at your option.
 
-This project contains a vendored copy of [Vectorscan](https://github.com/Vectorcamp/vectorscan), which is released under a 3-clause BSD license ([LICENSE-VECTORSCAN](../LICENSE-VECTORSCAN)).
+This project contains a vendored copy of [Vectorscan](https://github.com/Vectorcamp/vectorscan), which is released under a 3-clause BSD license.
+See the [NOTICE](../NOTICE) file for details.
 
 
 ## Contributing

@@ -8,8 +8,8 @@ on:
     - main
 
   schedule:
-  # Force a run every day at 0007 UTC
-  - cron: '00 07 * * *'
+  # Force a run every tuesday at at 0700 UTC
+  - cron: '* 07 * * 2'
 
 
 env:
@@ -48,13 +48,13 @@ jobs:
     strategy:
       matrix:
         include:
-        - name: ubuntu-20.04.x86_64.release
-          os: ubuntu-20.04
+        - name: ubuntu-22.04.x86_64.release
+          os: ubuntu-22.04
           rust: stable
           profile: release
           features: unit_hyperscan
           install_dependencies: |
-            sudo apt-get install zsh libboost-all-dev
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
           check_docs: false
           use_ninja: false
 
@@ -64,7 +64,7 @@ jobs:
           profile: test
           features: unit_hyperscan
           install_dependencies: |
-            sudo apt-get install zsh libboost-all-dev
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
           check_docs: true
           use_ninja: false
 
@@ -74,7 +74,18 @@ jobs:
           profile: release
           features: unit_hyperscan,cpu_native
           install_dependencies: |
-            sudo apt-get install zsh libboost-all-dev
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
+          check_docs: false
+          use_ninja: false
+
+
+        - name: ubuntu-24.04.x86_64.release
+          os: ubuntu-24.04
+          rust: stable
+          profile: release
+          features: unit_hyperscan
+          install_dependencies: |
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
           check_docs: false
           use_ninja: false
 
@@ -84,41 +95,51 @@ jobs:
           profile: test
           features: unit_hyperscan
           install_dependencies: |
-            sudo apt-get install zsh libboost-all-dev
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
           check_docs: true
           use_ninja: false
 
-        - name: macos-13.x86_64.test
-          os: macos-13
+        - name: ubuntu-24.04.x86_64.release.cpu_native
+          os: ubuntu-24.04
           rust: stable
-          profile: test
-          features: unit_hyperscan
+          profile: release
+          features: unit_hyperscan,cpu_native
           install_dependencies: |
-            brew install coreutils boost ninja
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
           check_docs: false
-          use_ninja: true
+          use_ninja: false
 
-        - name: macos-13.x86_64.release
-          os: macos-13
+
+        - name: ubuntu-24.04.arm64.release
+          os: ubuntu-24.04-arm
           rust: stable
           profile: release
           features: unit_hyperscan
           install_dependencies: |
-            brew install coreutils boost
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
           check_docs: false
           use_ninja: false
 
-        # Fails with `unknown target CPU 'x86_64_v2'`:
-        #
-        # - name: macos-13.x86_64.release.cpu_native
-        #   os: macos-13
-        #   rust: stable
-        #   profile: release
-        #   features: unit_hyperscan,cpu_native
-        #   install_dependencies: |
-        #     brew install coreutils boost ninja
-        #   check_docs: false
-        #   use_ninja: true
+        - name: ubuntu-24.04.arm64.test
+          os: ubuntu-24.04-arm
+          rust: stable
+          profile: test
+          features: unit_hyperscan
+          install_dependencies: |
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
+          check_docs: true
+          use_ninja: false
+
+        - name: ubuntu-24.04.arm64.release.cpu_native
+          os: ubuntu-24.04-arm
+          rust: stable
+          profile: release
+          features: unit_hyperscan,cpu_native
+          install_dependencies: |
+            sudo apt-get update && sudo apt-get install zsh libboost-all-dev
+          check_docs: false
+          use_ninja: false
+
 
         - name: macos-14.arm64.test
           os: macos-14  # m1-based macos
@@ -126,7 +147,7 @@ jobs:
           profile: test
           features: unit_hyperscan
           install_dependencies: |
-            brew install coreutils boost ninja
+            brew install coreutils boost
           check_docs: false
           use_ninja: true
 
@@ -136,7 +157,7 @@ jobs:
           profile: release
           features: unit_hyperscan
           install_dependencies: |
-            brew install coreutils boost ninja
+            brew install coreutils boost
           check_docs: false
           use_ninja: true
 
@@ -147,7 +168,7 @@ jobs:
           profile: release
           features: unit_hyperscan,gen
           install_dependencies: |
-            brew install coreutils boost ninja
+            brew install coreutils boost
           check_docs: false
           use_ninja: true
 
@@ -157,7 +178,91 @@ jobs:
           profile: release
           features: unit_hyperscan,cpu_native
           install_dependencies: |
-            brew install coreutils boost ninja
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+
+        - name: macos-15.arm64.test
+          os: macos-15
+          rust: stable
+          profile: test
+          features: unit_hyperscan
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+        - name: macos-15.arm64.release
+          os: macos-15
+          rust: stable
+          profile: release
+          features: unit_hyperscan
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+        # A build that runs with `bindgen` enabled
+        - name: macos-15.arm64.gen.release
+          os: macos-15
+          rust: stable
+          profile: release
+          features: unit_hyperscan,gen
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+        - name: macos-15.arm64.release.cpu_native
+          os: macos-15
+          rust: stable
+          profile: release
+          features: unit_hyperscan,cpu_native
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+
+        - name: macos-26.arm64.test
+          os: macos-26
+          rust: stable
+          profile: test
+          features: unit_hyperscan
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+        - name: macos-26.arm64.release
+          os: macos-26
+          rust: stable
+          profile: release
+          features: unit_hyperscan
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+        # A build that runs with `bindgen` enabled
+        - name: macos-26.arm64.gen.release
+          os: macos-26
+          rust: stable
+          profile: release
+          features: unit_hyperscan,gen
+          install_dependencies: |
+            brew install coreutils boost
+          check_docs: false
+          use_ninja: true
+
+        - name: macos-26.arm64.release.cpu_native
+          os: macos-26
+          rust: stable
+          profile: release
+          features: unit_hyperscan,cpu_native
+          install_dependencies: |
+            brew install coreutils boost
           check_docs: false
           use_ninja: true
 
